@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import Session from '../models/Session';
+import { Types } from "mongoose";
 
 const createSessionSchema = z.object({
   start_time: z.string().datetime(),
@@ -37,8 +38,24 @@ export const createSession = async (req: Request, res: Response): Promise<void> 
 
 export const getSessions = async (req: Request, res: Response): Promise<void> => {
   try {
-    const sessions = await Session.find({});
-    res.json(sessions);
+    const limit = parseInt(req.query.limit as string) || 10;
+    const cursor = req.query.cursor as string;
+
+    const query: any = {};
+    if (cursor) {
+      query._id = { $lt: new Types.ObjectId(cursor) };
+    }
+
+    const sessions = await Session.find(query)
+      .sort({ _id: -1 })
+      .limit(limit);
+
+    const nextCursor = sessions.length === limit ? sessions[sessions.length - 1]._id : null;
+
+    res.json({
+      data: sessions,
+      nextCursor
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server Error', error });
   }
